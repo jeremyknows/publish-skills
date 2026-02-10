@@ -37,8 +37,7 @@ git clone https://github.com/jeremyknows/publish-skills.git
 ### OpenClaw
 
 ```bash
-mkdir -p skills
-cd skills
+cd ~/.openclaw/skills
 git clone https://github.com/jeremyknows/publish-skills.git
 ```
 
