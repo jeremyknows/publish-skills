@@ -11,6 +11,7 @@ license: MIT
 metadata:
   author: jeremyknows
   version: "1.0.0"
+  autoresearch-baseline: "7/12 quality score (2026-03-18)"
 ---
 
 # Publish an Agent Skill
@@ -132,6 +133,31 @@ The checklist above catches structural issues. For a thorough review, follow it 
 
 The second pass catches things checklists can't: factual inaccuracies in your descriptions, inconsistencies between SKILL.md and README.md, stale claims, and scope creep.
 
+## Sustainability: Autoresearch & Self-Improvement
+
+Published skills should be designed for autonomous improvement. Before publishing, ensure:
+
+- [ ] **Known Limitations documented** — "Known Limitations & Gotchas" section exists with 2+ concrete constraints
+- [ ] **Scoring criteria defined** — Skill includes or references how to measure "working well"
+- [ ] **Category assigned** — `metadata.category` field matches the 9-category taxonomy
+- [ ] **Description trigger-ready** — Description uses Intent + Constraint pattern (not just summary)
+- [ ] **Success metrics identified** — If autoresearch were to improve this skill, what metric would change? (e.g., "false positive triggers", "gotcha pass rate", "end-user satisfaction")
+
+### Autoresearch & Maintenance Plan (Optional)
+
+If your skill is part of an autoresearch program, document the plan in a comment:
+
+```yaml
+metadata:
+  autoresearch:
+    frequency: "weekly"        # How often to evaluate this skill
+    scoring_model: "sonnet"    # What model to use for scoring
+    success_metric: "gotcha_pass_rate >= 95%"  # Definition of "working"
+    review_team: "DevOps"      # Who reviews failures
+```
+
+This signals to autoresearch agents that your skill is **actively maintained** and they should invest cycles in it.
+
 ## Verification
 
 Before pushing, validate with the official reference library:
@@ -152,3 +178,71 @@ After pushing, verify on GitHub:
 - [skills-ref Validation Library](https://github.com/agentskills/agentskills/tree/main/skills-ref)
 - [Example Skills (Anthropic)](https://github.com/anthropics/skills)
 - [Creating Custom Skills (Claude)](https://support.claude.com/en/articles/12512198-creating-custom-skills)
+
+---
+
+## Autoresearch: Skill Self-Evaluation
+
+**Baseline Score:** 10/12 (2026-03-18)  
+**Target Score:** 12/12  
+**Gaps to Address:** Progressive disclosure, dependency formalization
+
+### Publish-Skills-Specific Quality Checklist
+
+When running autoresearch iterations on this skill, use these 6 objective criteria:
+
+1. **Frontmatter Validation:** Does the guide correctly validate SKILL.md frontmatter (name format, description length, required vs. optional fields)? Test by running against a deliberately malformed SKILL.md.
+   - **Verification:** Create test skill with wrong name format (uppercase, spaces, consecutive hyphens). Checklist should catch all 3.
+
+2. **Clone URL Accuracy:** Do all clone/install URLs in the README.md template examples point to a valid schema format? Test by extracting all URLs and verifying patterns match `https://github.com/{org}/{repo}`.
+   - **Verification:** `grep -o "github.com/[^/]*/[^/]*" publish-skills/SKILL.md | sort -u` should show only valid org/repo patterns.
+
+3. **Pre-Publish Checklist Completeness:** Are all 8 pre-publish checklist items actionable and testable? Each should have a clear verification command or manual check.
+   - **Verification:** For each of the 8 items in "7. Consistency Review", confirm a user could perform it without asking for clarification.
+
+4. **Common Mistakes Coverage:** Do the 7 common mistakes cover the actual failure modes when publishing skills? Should match real errors from published skills.
+   - **Verification:** Read 3 published skills on GitHub; identify any pre-publish errors not covered in the "Common Pre-Publish Mistakes" table. If found, gaps exist.
+
+5. **Directory Structure Prescription:** Is the recommended directory structure (SKILL.md, LICENSE.txt, README.md, scripts/, references/, assets/) clear enough that a user building a skill folder could follow it unambiguously?
+   - **Verification:** Show the directory structure template to a new user building a skill. Can they build it without questions? If yes, criterion met.
+
+6. **GitHub Verification Steps:** Are the 4 post-push verification steps (README rendering, LICENSE badge, file structure cleanliness, clone/run test) sufficient to catch 90%+ of publication issues?
+   - **Verification:** Audit 5 recently-published skills. Do they all pass the 4 verification steps? Identify any issues that would have been caught by an additional verification step.
+
+### Autoresearch Mutation Candidates
+
+**High-priority mutations to test:**
+
+1. **Add Progressive Disclosure Section** — Create `references/agentskills-spec.md` and `references/common-pitfalls.md`. Update SKILL.md frontmatter to reference them. Measure: reduced token count of SKILL.md body while maintaining clarity.
+
+2. **Formalize Dependencies** — Add explicit "Dependencies" section listing `npx skills-ref` as a required tool. Add version constraints if applicable (Node.js version, npm version).
+
+3. **Add Scripted Validation** — Create `scripts/validate-skill.sh` that runs the 8-step checklist programmatically on a target skill. Measure: can users run the checker as a one-liner vs. manual steps.
+
+4. **Expand GitHub-Specific Verification** — Add curl/gh CLI commands to verify LICENSE detection and README rendering without manual GitHub UI interaction. Measure: reduce verification time from 5 min to <1 min.
+
+5. **Add Example Skill Audit** — Provide a full worked example of auditing a real published skill (e.g., `anthropics/skills/my-skill`) through all 8 steps. Measure: user clarity on how to apply the checklist.
+
+### Running Autoresearch
+
+To improve publish-skills beyond 10/12:
+
+```bash
+# Phase 1: Define test inputs
+# Test inputs: 3 pre-publication skills (one compliant, one with mistakes, one mixed)
+
+# Phase 2: Run autoresearch loop
+# Focus on mutations that reduce manual review time while maintaining coverage
+
+# Phase 3: Target improvements
+# Primary: Progressive disclosure (file system restructuring)
+# Secondary: Dependency formalization
+# Tertiary: Scripted validation helpers
+
+# Success criteria: 12/12 when all 6 checklist items pass 100% consistently
+```
+
+**Notes for next auditor:**
+- Consider whether this skill should be split into two: "Design Skills" (SKILL.md format) and "Publish Skills" (GitHub release process). Current blend works but boundaries are fuzzy.
+- The two-pass review pattern (manual + critical code review) is strong. Don't mutate this.
+- Progressive disclosure is the largest gap. Reorganizing into references/ folders would improve token efficiency.
