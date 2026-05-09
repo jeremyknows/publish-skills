@@ -136,30 +136,39 @@ Run through these checks before the first commit:
 SANITIZER_DIR=~/atlas/shared/scripts/skills
 
 # Stage 1: Transform known-pattern leaks (paths, conventions). Strips author-marked private blocks.
+# Refuses if output path equals input path (would destroy canonical fleet copy).
 bash $SANITIZER_DIR/publish-sanitize.sh path/to/SKILL.md /tmp/SKILL.publish.md
 
-# Stage 2: Deny-list scan on output. Exits 2 if anything BLOCK survives; 1 for WARN; 0 clean.
+# Stage 2: Deny-list scan on output. STRICT BY DEFAULT: WARN matches are treated as BLOCK.
+# Exit 2 = BLOCK (publish forbidden); 1 = WARN-only with --allow-warn; 0 = clean.
 bash $SANITIZER_DIR/post-scan.sh /tmp/SKILL.publish.md
-# If exit 2: remediate (wrap in markers OR rephrase) and re-run from Stage 1.
-# If exit 1: manual review of WARN matches; re-run with --strict to gate.
+# If exit 2: remediate (wrap source in atlas-private markers OR rephrase) and re-run from Stage 1.
+# If you intentionally want to ship despite WARN matches: rerun with `--allow-warn` and review carefully.
 
-# Stage 3: Manual diff against last-published version. Operator-in-loop final stop.
+# Stage 3: Manual diff. Operator-in-loop final stop.
+# For first publish (no prior published version exists):
+diff -u path/to/SKILL.md /tmp/SKILL.publish.md | less
+# Review every removal as intentional, every transform as desired.
+# For subsequent publishes:
 diff -u path/to/last-published-SKILL.md /tmp/SKILL.publish.md | less
+
 # Then: cp /tmp/SKILL.publish.md path/to/public-repo/SKILL.md && gh pr create ...
 ```
 
 **Author discipline (the only manual surface):**
 
-Mark fleet-private content with markers; the sanitizer strips between them:
+Mark fleet-private content with markers; the sanitizer strips between them. Markers are case-insensitive and whitespace-tolerant inside (`<!-- ATLAS-PRIVATE:START -->` and `<!--  atlas-private  :  start  -->` both work); nested markers are rejected (sanitizer exits 2):
 
 ```markdown
 <!-- atlas-private:start -->
-War story: Watson dispatched a sprint at 18:00 ET via the bridge daemon...
+War story: <agent-name-here> dispatched a sprint at 18:00 ET via the bridge daemon...
 (everything between markers ships in fleet copy; gets stripped on publish)
 <!-- /atlas-private:end -->
 ```
 
 Inside markers: anything goes (real agent names, real paths, real incidents). Outside markers: only generic/portable content. The post-scanner BLOCKS unmarked named-entity leaks — if you forget to wrap, publish fails loud.
+
+**Bypass risk to know about:** if you see a BLOCK on `/tmp/SKILL.publish.md`, the correct fix is to **wrap the source in atlas-private markers** (or rephrase the source), then re-run the pipeline. Manually deleting the offending line FROM THE OUTPUT instead leaves the underlying source still leaking — next publish reintroduces the same leak. Wrap, don't delete.
 
 **Refinement protocol:**
 
