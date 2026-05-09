@@ -233,6 +233,40 @@ After pushing, verify on GitHub:
 3. File structure looks clean (no .DS_Store, no stray files)
 4. Clone and run: `git clone ... && node scripts/my-script.js --help`
 
+### 10. Set repo metadata (description + homepage + topics)
+
+Once the repo exists, set discovery metadata so the skill is findable:
+
+```bash
+# Description should LEAD WITH THE SKILL NAME, not a category prefix.
+# Bad:  "AgentSkill: do X for Y" — generic; loses the skill's identity in search
+# Good: "<skill-name> — do X for Y. Key features. Spec compliance."
+gh repo edit <org>/<skill-name> --description "<skill-name> — <one-line what + why>"
+
+# Homepage: clear if no real project homepage exists. Don't point at the spec
+# (agentskills.io) — that's the SPEC's home, not the SKILL's home.
+gh repo edit <org>/<skill-name> --homepage ""
+# OR set to a real project page if you have one:
+gh repo edit <org>/<skill-name> --homepage "https://<your-skill-page>"
+
+# Topics: 4-8 tags for discovery. Standard agentskills topics + skill-specific.
+gh repo edit <org>/<skill-name> --add-topic agentskills,claude-code,<topic1>,<topic2>,<topic3>
+```
+
+**Topic tag picks (canonical for fleet skills):**
+- `agentskills` — for the agentskills.io ecosystem
+- `claude-code` — works in Claude Code (omit if true model-agnostic)
+- The skill's primary noun (e.g., `session-handoff`, `code-review`, `pre-publish`)
+- The skill's category (e.g., `meta-skill`, `runbook`, `data-fetching`)
+- Observability / autoresearch tag if applicable: `observability`
+
+**Verify final state:**
+```bash
+gh repo view <org>/<skill-name> --json description,homepageUrl,repositoryTopics
+```
+
+**Why this matters:** spec compliance and a clean LICENSE get you to "valid skill"; description + homepage + topics get you to "discoverable skill." A published skill with an accurate description and 5+ topics shows up in GitHub search; one without is invisible.
+
 ## References
 
 - [Agent Skills Specification](https://agentskills.io/specification)
