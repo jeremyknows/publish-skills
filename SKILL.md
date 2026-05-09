@@ -1,5 +1,6 @@
 ---
 name: publish-skills
+runtime: claude-code
 description: |
   Checklist for publishing an Agent Skills spec-compliant skill to GitHub.
   Use when: (1) preparing a skill for open source release, (2) reviewing a
@@ -123,6 +124,57 @@ Run through these checks before the first commit:
 | Committer identity shows machine user, not author | `git log --format="%an <%ae>"` |
 | SKILL.md `name` doesn't match directory name | Compare frontmatter to `basename $(pwd)` |
 | Description exceeds 1024 chars | `grep -A20 'description' SKILL.md \| wc -c` |
+| Fleet-internal personas / paths leak into "public" SKILL.md | **Run the publish-time sanitizer pipeline (Section 9)** |
+
+### 9. Publish-Time Sanitizer Pipeline (MANDATORY for fleet skills with private context)
+
+**Why this exists.** A skill authored inside a working agent fleet (Atlas, etc.) accumulates fleet-specific signal — named agent references (Watson, Librarian), workspace paths (`~/atlas/...`), war stories with private context. This signal makes the skill MORE effective for fleet agents but blocks public publish. The sanitizer pipeline lets you maintain ONE source of truth (the canonical fleet-rich SKILL.md) and emit a clean publishable copy on demand. Trust posture: defense in depth — automated transforms + post-scanner deny-list + manual diff before push.
+
+**Pipeline (3 stages, each fail-loud):**
+
+```bash
+SANITIZER_DIR=~/atlas/shared/scripts/skills
+
+# Stage 1: Transform known-pattern leaks (paths, conventions). Strips author-marked private blocks.
+bash $SANITIZER_DIR/publish-sanitize.sh path/to/SKILL.md /tmp/SKILL.publish.md
+
+# Stage 2: Deny-list scan on output. Exits 2 if anything BLOCK survives; 1 for WARN; 0 clean.
+bash $SANITIZER_DIR/post-scan.sh /tmp/SKILL.publish.md
+# If exit 2: remediate (wrap in markers OR rephrase) and re-run from Stage 1.
+# If exit 1: manual review of WARN matches; re-run with --strict to gate.
+
+# Stage 3: Manual diff against last-published version. Operator-in-loop final stop.
+diff -u path/to/last-published-SKILL.md /tmp/SKILL.publish.md | less
+# Then: cp /tmp/SKILL.publish.md path/to/public-repo/SKILL.md && gh pr create ...
+```
+
+**Author discipline (the only manual surface):**
+
+Mark fleet-private content with markers; the sanitizer strips between them:
+
+```markdown
+<!-- atlas-private:start -->
+War story: Watson dispatched a sprint at 18:00 ET via the bridge daemon...
+(everything between markers ships in fleet copy; gets stripped on publish)
+<!-- /atlas-private:end -->
+```
+
+Inside markers: anything goes (real agent names, real paths, real incidents). Outside markers: only generic/portable content. The post-scanner BLOCKS unmarked named-entity leaks — if you forget to wrap, publish fails loud.
+
+**Refinement protocol:**
+
+- **New leak class encountered?** Append a row to `$SANITIZER_DIR/rules/transforms.tsv` (auto-replace) OR `$SANITIZER_DIR/rules/deny-list.tsv` (BLOCK on detection). Rules files are append-only — never delete a rule unless it produces a verified false positive.
+- **New skill ready to publish?** Drop a fixture into `$SANITIZER_DIR/test-fixtures/input/` with the leak class. If it doesn't have a corresponding `expected/` file, it becomes a scan-block test. Run `bash $SANITIZER_DIR/test-publish-sanitize.sh` before any sanitizer-rule change to confirm no regressions.
+- **Sanitizer or scanner produced a false positive on something legitimate?** Refine the regex; add a fixture; rerun tests. Don't remove the rule.
+
+**Test the pipeline before relying on it:**
+
+```bash
+bash $SANITIZER_DIR/test-publish-sanitize.sh
+# Expected: all PASS. If anything fails, the sanitizer is broken — do not publish.
+```
+
+**This step is MANDATORY** for any skill that lives inside a working agent fleet and is being prepared for public publish. The just-completed manual sanitization of `baton/SKILL.md` proved the leak class is real and recurring — every fleet skill has it. The sanitizer pipeline is the durable mitigation.
 
 ## Recommended: Two-Pass Review
 
@@ -178,6 +230,15 @@ After pushing, verify on GitHub:
 - [skills-ref Validation Library](https://github.com/agentskills/agentskills/tree/main/skills-ref)
 - [Example Skills (Anthropic)](https://github.com/anthropics/skills)
 - [Creating Custom Skills (Claude)](https://support.claude.com/en/articles/12512198-creating-custom-skills)
+
+### Fleet-internal infrastructure (Atlas — adapt to your fleet)
+
+- `~/atlas/shared/scripts/skills/publish-sanitize.sh` — Stage 1 sanitizer (transforms + marker stripping)
+- `~/atlas/shared/scripts/skills/post-scan.sh` — Stage 2 deny-list scanner (BLOCK / WARN severity)
+- `~/atlas/shared/scripts/skills/test-publish-sanitize.sh` — regression test suite
+- `~/atlas/shared/scripts/skills/rules/transforms.tsv` — append-only path/token transforms
+- `~/atlas/shared/scripts/skills/rules/deny-list.tsv` — append-only deny-list (severity-tagged)
+- `~/atlas/shared/scripts/skills/test-fixtures/{input,expected}/` — adversarial test corpus
 
 ---
 
