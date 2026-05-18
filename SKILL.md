@@ -128,12 +128,13 @@ Run through these checks before the first commit:
 
 ### 9. Publish-Time Sanitizer Pipeline (MANDATORY for fleet skills with private context)
 
-**Why this exists.** A skill authored inside a working agent fleet (Atlas, etc.) accumulates fleet-specific signal — named agent references (Watson, Librarian), workspace paths (`~/atlas/...`), war stories with private context. This signal makes the skill MORE effective for fleet agents but blocks public publish. The sanitizer pipeline lets you maintain ONE source of truth (the canonical fleet-rich SKILL.md) and emit a clean publishable copy on demand. Trust posture: defense in depth — automated transforms + post-scanner deny-list + manual diff before push.
+**Why this exists.** A skill authored inside a working agent fleet (Atlas, etc.) accumulates fleet-specific signal — named agent references (Orchestrator, Researcher), workspace paths (`~/my-fleet/...`), war stories with private context. This signal makes the skill MORE effective for fleet agents but blocks public publish. The sanitizer pipeline lets you maintain ONE source of truth (the canonical fleet-rich SKILL.md) and emit a clean publishable copy on demand. Trust posture: defense in depth — automated transforms + post-scanner deny-list + manual diff before push.
 
 **Pipeline (3 stages, each fail-loud):**
 
 ```bash
-SANITIZER_DIR=~/atlas/shared/scripts/skills
+# Set SANITIZER_DIR to where publish-skills/scripts/ is installed on your machine
+SANITIZER_DIR=<skills-install>/publish-skills/scripts  # adjust to your install path
 
 # Stage 1: Transform known-pattern leaks (paths, conventions). Strips author-marked private blocks.
 # Refuses if output path equals input path (would destroy canonical fleet copy).
@@ -157,14 +158,15 @@ diff -u path/to/last-published-SKILL.md /tmp/SKILL.publish.md | less
 
 **Author discipline (the only manual surface):**
 
-Mark fleet-private content with markers; the sanitizer strips between them. Markers are case-insensitive and whitespace-tolerant inside (`<!-- ATLAS-PRIVATE:START -->` and `<!--  atlas-private  :  start  -->` both work); nested markers are rejected (sanitizer exits 2):
+Mark fleet-private content with markers; the sanitizer strips between them. Markers are case-insensitive and whitespace-tolerant inside (e.g. `atlas-private:start` with any case/spacing variation); nested markers are rejected (sanitizer exits 2):
 
 ```markdown
-<!-- atlas-private:start -->
+<!-- [your-fleet]-private:start -->
 War story: <agent-name-here> dispatched a sprint at 18:00 ET via the bridge daemon...
 (everything between markers ships in fleet copy; gets stripped on publish)
-<!-- /atlas-private:end -->
+<!-- /[your-fleet]-private:end -->
 ```
+*(Replace `[your-fleet]` with your fleet's name — e.g. `atlas-private`, `acme-private`, etc. Update the sanitizer regex to match.)*
 
 Inside markers: anything goes (real agent names, real paths, real incidents). Outside markers: only generic/portable content. The post-scanner BLOCKS unmarked named-entity leaks — if you forget to wrap, publish fails loud.
 
@@ -183,7 +185,7 @@ bash $SANITIZER_DIR/test-publish-sanitize.sh
 # Expected: all PASS. If anything fails, the sanitizer is broken — do not publish.
 ```
 
-**This step is MANDATORY** for any skill that lives inside a working agent fleet and is being prepared for public publish. The just-completed manual sanitization of `baton/SKILL.md` proved the leak class is real and recurring — every fleet skill has it. The sanitizer pipeline is the durable mitigation.
+**This step is MANDATORY** for any skill that lives inside a working agent fleet and is being prepared for public publish. Real-world use on internal fleet skills confirmed the leak class is real and recurring — every fleet skill has it. The sanitizer pipeline is the durable mitigation.
 
 ## Recommended: Two-Pass Review
 
@@ -274,14 +276,13 @@ gh repo view <org>/<skill-name> --json description,homepageUrl,repositoryTopics
 - [Example Skills (Anthropic)](https://github.com/anthropics/skills)
 - [Creating Custom Skills (Claude)](https://support.claude.com/en/articles/12512198-creating-custom-skills)
 
-### Fleet-internal infrastructure (Atlas — adapt to your fleet)
-
-- `~/atlas/shared/scripts/skills/publish-sanitize.sh` — Stage 1 sanitizer (transforms + marker stripping)
-- `~/atlas/shared/scripts/skills/post-scan.sh` — Stage 2 deny-list scanner (BLOCK / WARN severity)
-- `~/atlas/shared/scripts/skills/test-publish-sanitize.sh` — regression test suite
-- `~/atlas/shared/scripts/skills/rules/transforms.tsv` — append-only path/token transforms
-- `~/atlas/shared/scripts/skills/rules/deny-list.tsv` — append-only deny-list (severity-tagged)
-- `~/atlas/shared/scripts/skills/test-fixtures/{input,expected}/` — adversarial test corpus
+### Sanitizer infrastructure (installed with this skill)
+- `<skills-install>/publish-skills/scripts/publish-sanitize.sh` — Stage 1 sanitizer (transforms + marker stripping)
+- `<skills-install>/publish-skills/scripts/post-scan.sh` — Stage 2 deny-list scanner (BLOCK / WARN severity)
+- `<skills-install>/publish-skills/scripts/test-publish-sanitize.sh` — regression test suite
+- `<skills-install>/publish-skills/scripts/rules/transforms.tsv` — append-only path/token transforms
+- `<skills-install>/publish-skills/scripts/rules/deny-list.tsv` — append-only deny-list (severity-tagged)
+- `<skills-install>/publish-skills/scripts/test-fixtures/{input,expected}/` — adversarial test corpus
 
 ---
 

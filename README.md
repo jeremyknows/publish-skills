@@ -16,6 +16,7 @@ Bridges the gap between "works locally" and "ready for open source." The Agent S
 - **README patterns** — section-by-section guide based on well-received published skills
 - **Consistency review** — 10-point checklist for catching pre-publish mistakes
 - **Common mistakes table** — what goes wrong and how to detect it
+- **Sanitizer pipeline** — for fleet skills with private context: strip internal paths, agent names, and war stories before publishing; defend with a deny-list scanner for credentials and residual leaks
 
 ## Install
 
@@ -98,14 +99,98 @@ This skill focuses on **getting a working skill ready for GitHub**. It does not 
 - **Marketplace publishing** — the Claude Code plugin marketplace (`.claude-plugin` format) is a separate distribution channel with its own requirements
 - **Skill discovery** — how agents find and select skills at runtime
 
+## Sanitizer Pipeline Setup
+
+If your skill lives inside a working agent fleet (internal paths, agent names, war stories), use the included sanitizer pipeline to emit a clean publishable copy without touching the source.
+
+### 1. Configure your fleet paths (`scripts/rules/transforms.tsv`)
+
+Open `scripts/rules/transforms.tsv` and add a row for each internal path you want to transform:
+
+```
+~/myfleet/shared/scripts/	<fleet-scripts>/	fleet shared scripts
+~/myfleet/agents/	<workspace>/agents/	fleet agent workspaces
+/Users/myusername/	<home>/	user home path
+```
+
+Format: `<sed-pattern>\t<replacement>\t<comment>`. Rules are applied in order — put longer paths before shorter ones.
+
+### 2. Configure your deny-list (`scripts/rules/deny-list.tsv`)
+
+Open `scripts/rules/deny-list.tsv` and add BLOCK rows for your fleet's agent names and internal tooling:
+
+```
+BLOCK	\b(AgentOne|AgentTwo)\b	fleet-agent-name	Wrap in fleet-private markers or replace with <agent>
+BLOCK	~/myfleet/	fleet-path	Add to transforms.tsv instead, or wrap in markers
+```
+
+The credential-leak rules (API keys, tokens, PEM keys) are already included and apply universally — don't remove them.
+
+### 3. Mark private content in your source
+
+Wrap fleet-internal content with marker comments. The sanitizer strips everything between them:
+
+```markdown
+<!-- [your-fleet]-private:start -->
+Internal war story, real agent names, private paths — anything fleet-specific.
+<!-- /[your-fleet]-private:end -->
+```
+
+Set `FLEET_MARKER` to your prefix (default: `atlas-private`):
+
+```bash
+# Use the default (atlas-private):
+bash scripts/publish-sanitize.sh path/to/SKILL.md /tmp/SKILL.publish.md
+
+# Or specify your own prefix:
+FLEET_MARKER=myfleet-private bash scripts/publish-sanitize.sh path/to/SKILL.md /tmp/SKILL.publish.md
+```
+
+### 4. Run the pipeline
+
+```bash
+# Stage 1: strip private blocks + apply transforms
+bash scripts/publish-sanitize.sh path/to/SKILL.md /tmp/SKILL.publish.md
+
+# Stage 2: deny-list scan (BLOCK = publish forbidden)
+bash scripts/post-scan.sh /tmp/SKILL.publish.md
+
+# Stage 3: manual diff — review every removal
+diff -u path/to/SKILL.md /tmp/SKILL.publish.md | less
+
+# Then copy the output to your public repo
+cp /tmp/SKILL.publish.md path/to/public-repo/SKILL.md
+```
+
+### 5. Run the test suite
+
+```bash
+bash scripts/test-publish-sanitize.sh
+# Expected: all PASS
+```
+
+Add your own fixtures to `scripts/test-fixtures/input/` — if there's a matching `expected/` file it becomes a transform test; without one it becomes a scan-block test.
+
+---
+
 ## File Structure
 
 ```
 publish-skills/
-├── SKILL.md          # Checklist (agents read this)
-├── LICENSE.txt       # MIT license
-├── README.md         # This file
-└── .gitignore
+├── SKILL.md                        # Checklist (agents read this)
+├── LICENSE.txt                     # MIT license
+├── README.md                       # This file
+├── .gitignore
+└── scripts/
+    ├── publish-sanitize.sh         # Stage 1: strip private blocks + apply transforms
+    ├── post-scan.sh                # Stage 2: deny-list scanner (BLOCK/WARN)
+    ├── test-publish-sanitize.sh    # Test suite
+    ├── rules/
+    │   ├── transforms.tsv          # Path/token transform rules (customize for your fleet)
+    │   └── deny-list.tsv           # Credential + fleet-leak rules (customize + extend)
+    └── test-fixtures/
+        ├── input/                  # Test input files
+        └── expected/               # Expected transform outputs (scan-block tests have no expected file)
 ```
 
 ## License

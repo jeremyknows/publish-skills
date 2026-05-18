@@ -1,0 +1,25 @@
+# Path / token transformations applied by publish-sanitize.sh.
+# Format: <pattern>\t<replacement>\t<comment>
+# Patterns are sed-style basic regex (BRE). Order matters — earlier rules win.
+# Append-only: never delete a rule unless it produces a verified false positive.
+#
+# SETUP:
+#   Add a row for each fleet-specific path or token you want to transform before
+#   publishing. Replace the examples below with your actual fleet paths.
+#
+#   Pattern       = sed BRE (basic regex). Use literal paths, not wildcards.
+#   Replacement   = text that will appear in the published output.
+#                   Use <placeholder-style> names to signal "fill this in."
+#   Comment       = free-text label for your own reference (not published).
+#
+# EXAMPLE ROWS (uncomment and adapt):
+# ~/myfleet/shared/scripts/	<fleet-scripts>/	fleet shared scripts path
+# ~/myfleet/agents/	<workspace>/agents/	fleet agent workspaces
+# ~/myfleet/	<workspace>/	fleet root
+# /Users/myuser/	<home>/	user home path
+# ~/.myagent/	<agent-config>/	agent config dir
+# myfleet-internal-hostname	<fleet-host>	internal hostname
+#
+# NOTE: path rules must be ordered longest-match-first. A rule for
+# ~/myfleet/shared/ must appear before ~/myfleet/ or the shorter rule
+# will transform the prefix before the longer one can match.

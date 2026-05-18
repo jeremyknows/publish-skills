@@ -1,0 +1,36 @@
+# Post-sanitize deny-list for post-scan.sh. Defense-in-depth — catches what transforms.tsv missed.
+# Format: <severity>\t<regex>\t<class>\t<remediation hint>\t<optional-exclusion-pattern>
+# Severity: BLOCK = publish forbidden | WARN = manual review (treated as BLOCK in strict mode)
+# Append-only — never delete a rule unless it produces a verified false positive.
+#
+# SETUP:
+#   1. Add BLOCK rows for your fleet's agent names, internal paths, and tooling names.
+#   2. Keep the credential-leak rules below — they apply to everyone.
+#   3. Adjust the WARN rows for any business names or handles relevant to your fleet.
+#
+# FLEET-SPECIFIC RULES (customize for your fleet):
+# BLOCK	\b(AgentOne|AgentTwo|InternalTool)\b	fleet-agent-name	Wrap in <!-- <fleet>-private:start -->...<!-- /<fleet>-private:end --> OR replace with <agent>
+# BLOCK	~/myfleet/	fleet-path-leak	Add a transforms.tsv rule, or wrap in fleet-private markers
+# BLOCK	/Users/myusername	specific-user-path	Replace with <home> or wrap in fleet-private markers
+# WARN	\bmycompany\b	business-name	Wrap in fleet-private markers if not relevant to skill function
+#
+# ---- CREDENTIAL LEAKS (universal — do not remove) ----------------------
+BLOCK	op://[^[:space:]]+	1password-uri	NEVER publish; remove or replace with <secret-ref>
+BLOCK	(channel|user|message|guild|thread)[_-]?id["[:space:]:=]+\d{17,19}	discord-snowflake-keyed	Discord ID with explicit key; never publish; wrap in markers or remove
+BLOCK	discord\.com/channels/\d+/\d+	discord-deep-link	Discord deep-link URL; wrap in markers or remove
+WARN	\b\d{17,19}\b	bare-19-digit-number	Could be Discord snowflake OR legitimate large integer; manual review
+BLOCK	xoxb-[A-Za-z0-9-]+	slack-bot-token	NEVER publish; rotate token immediately
+BLOCK	xoxp-[A-Za-z0-9-]+	slack-user-token	NEVER publish; rotate token immediately
+BLOCK	xoxa-[A-Za-z0-9-]+	slack-app-token	NEVER publish; rotate token immediately
+BLOCK	xoxr-[A-Za-z0-9-]+	slack-refresh-token	NEVER publish; rotate token immediately
+BLOCK	sk-[A-Za-z0-9]{20,}	openai-style-api-key	NEVER publish; rotate key immediately
+BLOCK	sk-ant-[A-Za-z0-9_-]{20,}	anthropic-api-key	NEVER publish; rotate key immediately
+BLOCK	ghp_[A-Za-z0-9]{36}	github-personal-token	NEVER publish; rotate token immediately
+BLOCK	gho_[A-Za-z0-9]{36}	github-oauth-token	NEVER publish; rotate token immediately
+BLOCK	AKIA[0-9A-Z]{16}	aws-access-key-id	NEVER publish; rotate key immediately
+BLOCK	-----BEGIN (RSA|OPENSSH|EC|DSA|PGP|ENCRYPTED) PRIVATE KEY-----	pem-private-key	NEVER publish; rotate key immediately
+BLOCK	[MN][A-Za-z0-9_-]{23}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,}	discord-bot-token	NEVER publish; rotate token immediately
+BLOCK	"private_key":[[:space:]]*"-----BEGIN	gcp-service-account-json	NEVER publish; rotate key immediately
+BLOCK	(sk_live_|rk_live_|pk_live_)[A-Za-z0-9]{20,}	stripe-live-key	NEVER publish; rotate key immediately
+BLOCK	\b\d{9,10}:[A-Za-z0-9_-]{35}	telegram-bot-token	NEVER publish; rotate token immediately
+BLOCK	Bearer [A-Za-z0-9._-]{20,}	bearer-token	NEVER publish if real; replace with <bearer-token-placeholder>
