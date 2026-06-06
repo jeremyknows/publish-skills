@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # post-scan.sh — Defense-in-depth scanner for sanitized SKILL.md output.
 #
-# Reads rules/deny-list.tsv. Each rule is <severity>\t<regex>\t<class>\t<remediation>.
+# Reads rules/deny-list.tsv (committed, public-safe credential rules) PLUS an optional
+# rules/deny-list.local.tsv (gitignored) for FLEET-PRIVATE rules — your own agent names,
+# internal project/concept names, host paths, bus IDs. Keeping fleet rules in the .local
+# file means the deny-list itself never publishes the very names it guards. Path of the
+# local file is env-overridable via PUBLISH_SKILLS_DENY_LOCAL (used by the test harness).
+# Each rule is <severity>\t<regex>\t<class>\t<remediation>[\t<exclusion>].
 # Severity: BLOCK (publish forbidden) | WARN (manual review)
 #
 # Output: tab-separated table to stderr; exit code reflects worst severity.
@@ -25,6 +30,9 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RULES_DIR="$SCRIPT_DIR/rules"
 DENY="$RULES_DIR/deny-list.tsv"
+# Fleet-private rules: gitignored local override, merged on top of the committed deny-list.
+# Env-overridable for testing. Absent by default (public clones scan with credential rules only).
+DENY_LOCAL="${PUBLISH_SKILLS_DENY_LOCAL:-$RULES_DIR/deny-list.local.tsv}"
 
 STRICT=1  # default; flipped to 0 by --allow-warn
 if [ "${1:-}" = "--allow-warn" ]; then
@@ -108,7 +116,7 @@ for FILE in "$@"; do
         fi
         ;;
     esac
-  done < "$DENY"
+  done < <(cat "$DENY" "$DENY_LOCAL" 2>/dev/null)
 done
 
 # Summary to stderr

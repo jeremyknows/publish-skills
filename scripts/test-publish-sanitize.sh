@@ -71,6 +71,35 @@ for INPUT in "$FIXTURES/input"/*.md; do
   fi
 done
 
+# --- Local-override mechanism test (deny-list.local.tsv) ---
+# Proves a fleet-private local rule file is merged on top of the committed deny-list.
+# Uses a generic placeholder name + an env-pointed temp file so no real fleet name enters
+# this (public) test corpus and the real rules/deny-list.local.tsv is never touched.
+LOCAL_TMP=$(mktemp)
+printf 'BLOCK\t\\bAcmeSecretAgent\\b\tfleet-name-test\tlocal-override regression rule\n' > "$LOCAL_TMP"
+IN_TMP=$(mktemp)
+echo "This skill mentions AcmeSecretAgent in passing." > "$IN_TMP"
+
+PUBLISH_SKILLS_DENY_LOCAL="$LOCAL_TMP" bash "$SCAN" "$IN_TMP" > /dev/null 2>&1
+if [ "$?" -eq 2 ]; then
+  echo "PASS  local-override  (deny-list.local.tsv rule blocks)"
+  PASS=$((PASS + 1))
+else
+  echo "FAIL  local-override  (expected exit 2 with local rule)"
+  FAIL=$((FAIL + 1)); FAILED_NAMES+=("local-override")
+fi
+
+# Negative: same input with NO local override must not block (proves the rule came from .local).
+PUBLISH_SKILLS_DENY_LOCAL=/nonexistent-deny-local bash "$SCAN" "$IN_TMP" > /dev/null 2>&1
+if [ "$?" -eq 0 ]; then
+  echo "PASS  local-override  (clean when no local rule present)"
+  PASS=$((PASS + 1))
+else
+  echo "FAIL  local-override  (negative case should be clean)"
+  FAIL=$((FAIL + 1)); FAILED_NAMES+=("local-override-negative")
+fi
+rm -f "$LOCAL_TMP" "$IN_TMP"
+
 echo ""
 echo "================================================"
 echo "Results: $PASS passed, $FAIL failed"

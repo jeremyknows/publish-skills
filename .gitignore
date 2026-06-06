@@ -1,1 +1,4 @@
 .DS_Store
+
+# Fleet-private deny-list rules — never publish (agent names, internal paths, project names)
+scripts/rules/deny-list.local.tsv
