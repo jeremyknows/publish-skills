@@ -19,6 +19,8 @@ metadata:
 
 Checklist for taking a working skill from "works locally" to "ready for GitHub."
 
+**Build pipeline position:** Run LAST. Chain is `skillify` (build) -> `skill-doctor` (audit, target 11+/14) -> `publish-skills` (ship). Do NOT publish before skill-doctor passes. NEVER use this skill to vet third-party skills for install (that is skill-doctor Phase 0).
+
 ## The Gap Between Valid and Publishable
 
 The Agent Skills spec (agentskills.io) says only `name` and `description` are required in SKILL.md frontmatter. But most published skills also include `license` and a `LICENSE.txt` file. Some include `compatibility` and `metadata` when relevant. Following only the minimum requirements produces a skill that works but looks unfinished on GitHub.
@@ -269,12 +271,50 @@ gh repo view <org>/<skill-name> --json description,homepageUrl,repositoryTopics
 
 **Why this matters:** spec compliance and a clean LICENSE get you to "valid skill"; description + homepage + topics get you to "discoverable skill." A published skill with an accurate description and 5+ topics shows up in GitHub search; one without is invisible.
 
+## Dependencies
+
+Required to run this skill end-to-end:
+
+| Dependency | Why | How to get it |
+|------------|-----|---------------|
+| `git` | Clone target skill, inspect history, verify committer identity | Pre-installed on macOS / `apt install git` |
+| `grep`, `awk`, `wc`, `basename` | Frontmatter and consistency checks | POSIX, pre-installed |
+| `npx` + `skills-ref` | Spec validation pass before push | `npm i -g npx` then `npx skills-ref validate .` |
+| Network access to `github.com` | Verify clone URLs resolve | — |
+
+Companion skills (optional but recommended):
+
+- **skill-doctor** — health audit before publishing. Run first to catch trigger / gotchas / scoring gaps.
+- **commit-leak-scan** — scan staged diff for personal data before the public push.
+
+## Known Limitations & Gotchas
+
+- **Description char limit varies by platform.** The Agent Skills spec allows up to 1024 chars, but Claude Code Cowork loads ALL skill descriptions at all times. Keep descriptions under ~200 chars or they eat the context budget for every session.
+- **`name` field is unforgiving.** Lowercase alphanumeric + hyphens only, no leading/trailing/consecutive hyphens, must match parent directory name exactly. A mismatch fails silently in some agents and the skill never loads.
+- **LICENSE.txt is detected by GitHub by filename.** Calling it `LICENSE.md` or `license.txt` (lowercase) breaks the GitHub license badge.
+- **`allowed-tools` is experimental.** Listed in spec but not honored consistently across agents. Do not rely on it for security; treat it as a hint.
+- **`npx skills-ref validate` validates spec compliance, not content quality.** A skill can pass validation and still be useless. Pair with the skill-doctor 14-question checklist for content health.
+- **Personal paths leak through code examples.** `~/Users/yourname/...` in a code snippet survives a casual review. Always grep for `/Users/`, `/home/`, `@gmail.com`, `@icloud.com` before pushing.
+- **`.gitignore` for `.DS_Store` only helps prospectively.** If `.DS_Store` was already committed, it stays in history. Run `git rm --cached **/.DS_Store` before the first public push.
+- **Two-pass review is not optional for first-time publishers.** The checklist catches structure. Pass 2 catches the description claiming features the skill does not actually support.
+
+## Output Scoring
+
+To grade an audit produced by this skill, run the scorecard at `references/output-scorecard.md`. Ten yes/no checks across Structural, Content, and Hygiene. Pass = 9/10 with all Structural items YES.
+
+## Worked Example
+
+See `references/example-skill.md` for a full before/after walkthrough on a hypothetical `weather-lookup` skill. Includes both passes (checklist + critical review), the fixes each pass caught, and the output template the audit should produce.
+
 ## References
 
 - [Agent Skills Specification](https://agentskills.io/specification)
 - [skills-ref Validation Library](https://github.com/agentskills/agentskills/tree/main/skills-ref)
 - [Example Skills (Anthropic)](https://github.com/anthropics/skills)
 - [Creating Custom Skills (Claude)](https://support.claude.com/en/articles/12512198-creating-custom-skills)
+- `references/output-scorecard.md` — 10-question pass/fail scorecard for any audit run
+- `references/example-skill.md` — worked walkthrough with full before/after
+
 
 ### Sanitizer infrastructure (installed with this skill)
 - `<skills-install>/publish-skills/scripts/publish-sanitize.sh` — Stage 1 sanitizer (transforms + marker stripping)
