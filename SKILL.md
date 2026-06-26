@@ -1,5 +1,11 @@
 ---
 name: publish-skills
+triggers:
+  - "/publish-skills"
+  - "publish skills"
+  - "is this skill ready to publish?"
+  - "1.0.0"
+  - "7/12 quality score (2026-03-18)"
 runtime: claude-code
 description: |
   Checklist for publishing an Agent Skills spec-compliant skill to GitHub.
