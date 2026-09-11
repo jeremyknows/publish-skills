@@ -1,13 +1,7 @@
 ---
 name: publish-skills
 runtime: claude-code
-description: |
-  Checklist for publishing an Agent Skills spec-compliant skill to GitHub.
-  Use when: (1) preparing a skill for open source release, (2) reviewing a
-  skill before first commit, (3) "is this skill ready to publish?", (4) auditing
-  an existing published skill for spec compliance. Covers SKILL.md frontmatter
-  fields (required + optional), directory structure, LICENSE.txt, README patterns,
-  consistency review, and common pre-publish mistakes.
+description: "Checklist for publishing an Agent Skills spec-compliant skill to GitHub. Use when preparing a skill for release, reviewing one before first commit, asking \"is this ready to publish?\", or auditing a published skill for spec compliance."
 license: MIT
 metadata:
   author: jeremyknows
